@@ -24,7 +24,8 @@ wildfireTS_wrapper/*.csv
 
 # no pycache
 __pycache__/
-/wildfireTS_wrapper/__pycache__/
+/wildfireTS_wrapper/__pycache__/*
+/wildfireTS_wrapper/fire_query/__pycache__/*
 
 # misc files
 *.lock
