@@ -21,6 +21,7 @@ logs/
 
 # no pycache
 __pycache__/
+/wildfireTS_wrapper/__pycache__/
 
 # misc files
 *.lock
