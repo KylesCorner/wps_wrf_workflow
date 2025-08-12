@@ -53,7 +53,6 @@ from fire_query.fire_query import plot_fire_locations
 
 
 
-RUNNING_SCRIPT = TEST_SCRIPT
 rippers = []
 watchdogs = {
         'casper':None,
@@ -145,10 +144,11 @@ def parse():
     parser = argparse.ArgumentParser(
         description = "Run WPS/WRF for fires in a selected US state."
     )
-    parser.add_argument("--states","-s",nargs="+" ,help="Filer by US state name (e.g. Washington)", default="WA")
+    parser.add_argument("--states","-s",nargs="+" ,help="Filer by US state name (e.g. Washington)", default=["WA"])
     parser.add_argument("--max-fires", "-m", help="Max fires processed",type=int, default=MAX_FIRES)
     parser.add_argument("--num-days", "-n", help="Number of days to process per fire",type=int, default=MAX_DAYS)
     parser.add_argument("--threads", "-t", help="Number working threads",type=int, default=MAX_WORKERS)
+    parser.add_argument("--dry-run", "-d", help="Do a dry run. No WPS/WRF",action="store_true")
     args = parser.parse_args()
     return args
     
@@ -156,6 +156,12 @@ def parse():
 def main():
 
     args = parse()
+
+    if args.dry_run:
+        running_script = TEST_SCRIPT
+    else:
+        running_script = WRF_SCRIPT
+
     state_csvs = [(state ,load_csv(state)) for state in args.states]
 
     semaphore = threading.Semaphore(args.threads)
@@ -187,7 +193,7 @@ def main():
                 yr.edit_geogrid()
                 yr.save_geogrid()
                 geogrid_path = yr.geogrid_output_path
-                geogrid_process = ["bash", str(RUNNING_SCRIPT),fire_dates[0], str(geogrid_path), str(fireId)]
+                geogrid_process = ["bash", str(running_script),fire_dates[0], str(geogrid_path), str(fireId)]
                 geogrid_map[fireId] = geogrid_process
 
                 # Create a process map for ease of running by fire Id
@@ -204,7 +210,7 @@ def main():
                     yaml_path = yr.wrf_output_path
 
                     print(f"Pre-processing {state_name} fire: {fireId} at {fdate}")
-                    process = ["bash",str(RUNNING_SCRIPT),fdate,str(yaml_path), str(fireId)]
+                    process = ["bash",str(running_script),fdate,str(yaml_path), str(fireId)]
                     process_map[fireId].append(process)
 
                     if(num_day > args.num_days):
