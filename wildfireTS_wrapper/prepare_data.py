@@ -55,7 +55,6 @@ from fire_query.fire_query import plot_fire_locations
 
 RUNNING_SCRIPT = WRF_SCRIPT
 rippers = []
-semaphore = threading.Semaphore(MAX_WORKERS)
 watchdogs = {
         'casper':None,
         'derecho':None,
@@ -89,7 +88,7 @@ def run_command(cmd_args):
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Command failed: {' '.join(cmd_args)}\n{e}")
 
-def worker(command_list, geogrid_command):
+def worker(command_list, geogrid_command, semaphore):
     with semaphore:
         try:
             subprocess.run(geogrid_command, check=True)
@@ -103,11 +102,11 @@ def worker(command_list, geogrid_command):
             except subprocess.CalledProcessError as e2:
                 print(f"[ERROR] Command failed: {str(e2)}")
 
-def run_fires_async(fire_command_dict, geogrid_command_dict):
+def run_fires_async(fire_command_dict, geogrid_command_dict, semaphore):
     threads = []
     for fireId, cmd in fire_command_dict.items():
         geogrid_command = geogrid_command_dict[fireId]
-        t = threading.Thread(target=worker, args=(cmd,geogrid_command))
+        t = threading.Thread(target=worker, args=(cmd,geogrid_command, semaphore))
         t.start()
         threads.append(t)
 
@@ -146,11 +145,14 @@ def main():
     parser = argparse.ArgumentParser(
         description = "Run WPS/WRF for fires in a selected US state."
     )
-    parser.add_argument("--state","-s", help="Filer by US state name (e.g. Washington)")
+    parser.add_argument("--state","-s", help="Filer by US state name (e.g. Washington)", default="Washington")
+    parser.add_argument("--max-fires", "-m", help="Max fires processed",type=int, default=MAX_FIRES)
+    parser.add_argument("--num-days", "-n", help="Number of days to process per fire",type=int, default=MAX_DAYS)
+    parser.add_argument("--workers", "-w", help="Number working threads",type=int, default=MAX_WORKERS)
     args = parser.parse_args()
 
     pkl = load_csv(args.state)
-    
+    semaphore = threading.Semaphore(args.workers)
     process_map = {}
     geogrid_map = {}
 
@@ -162,7 +164,7 @@ def main():
         for index, fire in pkl.iterrows():
 
             # limit number of fires processed
-            if(index > MAX_FIRES - 1):
+            if(index > args.max_fires - 1):
                 break 
 
             # setup run variables
@@ -198,11 +200,11 @@ def main():
                 process = ["bash",str(RUNNING_SCRIPT),fdate,str(yaml_path), str(fireId)]
                 process_map[fireId].append(process)
 
-                if(num_day > MAX_DAYS):
+                if(num_day > args.num_days):
                     break
 
 
-        run_fires_async(process_map, geogrid_map)
+        run_fires_async(process_map, geogrid_map, semaphore)
 
     finally:
 

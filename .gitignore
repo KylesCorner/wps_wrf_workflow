@@ -19,6 +19,9 @@ config/[0-9]*.yaml
 # no logs
 logs/
 
+# no filtered csv
+wildfireTS_wrapper/*.csv
+
 # no pycache
 __pycache__/
 /wildfireTS_wrapper/__pycache__/
