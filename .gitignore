@@ -6,3 +6,23 @@
 
 # sphinx output
 docs/_build
+
+# template spam
+templates/[0-9]*
+
+# yaml spam
+config/[0-9]*.yaml
+
+# no backups
+*.backup
+
+# no logs
+logs/
+
+# no pycache
+__pycache__/
+
+# misc files
+*.lock
+*.swp
+
