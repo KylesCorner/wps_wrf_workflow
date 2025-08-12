@@ -53,7 +53,7 @@ from fire_query.fire_query import plot_fire_locations
 
 
 
-RUNNING_SCRIPT = WRF_SCRIPT
+RUNNING_SCRIPT = TEST_SCRIPT
 rippers = []
 watchdogs = {
         'casper':None,
@@ -141,18 +141,24 @@ def detach_monitor():
 def move_wrf():
     pass
 
-def main():
+def parse():
     parser = argparse.ArgumentParser(
         description = "Run WPS/WRF for fires in a selected US state."
     )
-    parser.add_argument("--state","-s", help="Filer by US state name (e.g. Washington)", default="Washington")
+    parser.add_argument("--states","-s",nargs="+" ,help="Filer by US state name (e.g. Washington)", default="WA")
     parser.add_argument("--max-fires", "-m", help="Max fires processed",type=int, default=MAX_FIRES)
     parser.add_argument("--num-days", "-n", help="Number of days to process per fire",type=int, default=MAX_DAYS)
-    parser.add_argument("--workers", "-w", help="Number working threads",type=int, default=MAX_WORKERS)
+    parser.add_argument("--threads", "-t", help="Number working threads",type=int, default=MAX_WORKERS)
     args = parser.parse_args()
+    return args
+    
 
-    pkl = load_csv(args.state)
-    semaphore = threading.Semaphore(args.workers)
+def main():
+
+    args = parse()
+    state_csvs = [(state ,load_csv(state)) for state in args.states]
+
+    semaphore = threading.Semaphore(args.threads)
     process_map = {}
     geogrid_map = {}
 
@@ -160,48 +166,49 @@ def main():
         # run watchdog scripts
         attach_monitor()
 
-        # rip each fire in the pickle
-        for index, fire in pkl.iterrows():
+        for state_name, state_csv in state_csvs:
+            # rip each fire in the pickle
+            for index, fire in state_csv.iterrows():
 
-            # limit number of fires processed
-            if(index > args.max_fires - 1):
-                break 
+                # limit number of fires processed
+                if(index > args.max_fires - 1):
+                    break 
 
-            # setup run variables
-            nr = NmlRipper(fire)
-            fireId = nr.fireId
-            yr = YamlRipper(fireId)
-            fire_dates = nr.dateRange
-            process_map[fireId] = []
-            geogrid_map[fireId] = []
-            track_ripper(nr,yr)
+                # setup run variables
+                nr = NmlRipper(fire)
+                fireId = nr.fireId
+                yr = YamlRipper(fireId)
+                fire_dates = nr.dateRange
+                process_map[fireId] = []
+                geogrid_map[fireId] = []
+                track_ripper(nr,yr)
 
-            # setup and run the geogrid process once per fire id
-            yr.edit_geogrid()
-            yr.save_geogrid()
-            geogrid_path = yr.geogrid_output_path
-            geogrid_process = ["bash", str(RUNNING_SCRIPT),fire_dates[0], str(geogrid_path), str(fireId)]
-            geogrid_map[fireId] = geogrid_process
+                # setup and run the geogrid process once per fire id
+                yr.edit_geogrid()
+                yr.save_geogrid()
+                geogrid_path = yr.geogrid_output_path
+                geogrid_process = ["bash", str(RUNNING_SCRIPT),fire_dates[0], str(geogrid_path), str(fireId)]
+                geogrid_map[fireId] = geogrid_process
 
-            # Create a process map for ease of running by fire Id
-            for num_day, fdate in enumerate(fire_dates):
+                # Create a process map for ease of running by fire Id
+                for num_day, fdate in enumerate(fire_dates):
 
-                # change namelist
-                nr.edit(fdate)
-                nr.save()
-                template_dir = nr.output_dir
+                    # change namelist
+                    nr.edit(fdate)
+                    nr.save()
+                    template_dir = nr.output_dir
 
-                # generate yaml
-                yr.edit()
-                yr.save()
-                yaml_path = yr.wrf_output_path
+                    # generate yaml
+                    yr.edit()
+                    yr.save()
+                    yaml_path = yr.wrf_output_path
 
-                print(f"Pre-processing fire: {fireId} at {fdate}")
-                process = ["bash",str(RUNNING_SCRIPT),fdate,str(yaml_path), str(fireId)]
-                process_map[fireId].append(process)
+                    print(f"Pre-processing {state_name} fire: {fireId} at {fdate}")
+                    process = ["bash",str(RUNNING_SCRIPT),fdate,str(yaml_path), str(fireId)]
+                    process_map[fireId].append(process)
 
-                if(num_day > args.num_days):
-                    break
+                    if(num_day > args.num_days):
+                        break
 
 
         run_fires_async(process_map, geogrid_map, semaphore)
