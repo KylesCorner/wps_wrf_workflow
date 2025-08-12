@@ -2,7 +2,7 @@
 
 #PBS -N real
 #PBS -q main@desched1
-#PBS -l select=1:ncpus=64:mpiprocs=64
+#PBS -l select=1:ncpus=128:mpiprocs=128
 #PBS -l walltime=0:20:00
 #PBS -l job_priority=economy
 #PBS -j oe
@@ -15,5 +15,5 @@ mkdir -p $TMPDIR
 module list
 
 touch REAL_BEG
-mpiexec -n 64  ./real.exe
+mpiexec -n 128  ./real.exe
 touch REAL_END
