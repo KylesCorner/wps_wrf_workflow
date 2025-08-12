@@ -4,10 +4,13 @@ constants.py
 This file holds all the constants needed for the WRF pipeline.
 """
 from pathlib import Path
+import os
 
-HOME_DIR = Path("/glade/u/home/krstulich/wps_wrf_workflow/")
-SCRATCH_DIR = Path("/glade/derecho/scratch/krstulich/workflow/")
-HRRR_DIR = Path("/glade/derecho/scratch/krstulich/data/")
+USER = os.getlogin()
+
+HOME_DIR = Path(f"/glade/u/home/{USER}/wps_wrf_workflow/")
+SCRATCH_DIR = Path(f"/glade/derecho/scratch/{USER}/workflow/")
+HRRR_DIR = Path(f"/glade/derecho/scratch/{USER}/data/")
 WRAPPER_DIR = HOME_DIR / 'wildfireTS_wrapper'
 
 CSV_DIR = WRAPPER_DIR /  'filtered_fires.csv'
