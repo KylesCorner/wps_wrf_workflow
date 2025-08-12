@@ -92,14 +92,34 @@ def worker(command_list, geogrid_command, semaphore):
         try:
             subprocess.run(geogrid_command, check=True)
         except subprocess.CalledProcessError as e1:
+            logfile = HOME_DIR / 'logs' / geogrid_command[4] / f"{cmd[2].log}"
+            result = subprocess.run(
+                ["tail", "-n", "10", logfile],
+                capture_output=True,
+                text=True
+            )
             print(f"[ERROR] Geogrid failed: {str(e1)}")
+            print(f"Consult {logfile} for more details.")
+            print("---------------- LOG FILE SNIPPET --------------------")
+            print(result.stdout)
+            print("------------------------------------------------------")
             return
 
         for cmd in command_list:
             try:
                 subprocess.run(cmd, check=True)
             except subprocess.CalledProcessError as e2:
+                logfile = HOME_DIR / 'logs' / cmd[4] / f"{cmd[2]}.log"
+                result = subprocess.run(
+                    ["tail", "-n", "10", logfile],
+                    capture_output=True,
+                    text=True
+                )
                 print(f"[ERROR] Command failed: {str(e2)}")
+                print(f"Consult {logfile} for more details.")
+                print("---------------- LOG FILE SNIPPET --------------------")
+                print(result.stdout)
+                print("------------------------------------------------------")
 
 def run_fires_async(fire_command_dict, geogrid_command_dict, semaphore):
     threads = []
