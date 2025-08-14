@@ -1,3 +1,8 @@
+"""
+This program handles all the fortran namelist stuff for WPS/WRF. It also handles the creation of job submission scripts for each step of WPS/WRF.
+
+Each script and namelist is split into directories by fire id for ease of running in parallel.
+"""
 import f90nml
 import pandas as pd
 import os

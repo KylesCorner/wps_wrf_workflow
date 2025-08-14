@@ -1,3 +1,15 @@
+"""
+This program will plot all the central points for the fires outlined in the WildfireTS dataset. You can query the fires by state and get the according csv file with the following fields:
+    - Fire ID
+    - Start Date
+    - End Date
+    - Lat
+    - Lon
+
+This csv will be pumped into the WildfireTS_wrapper for wrf weather simuations.
+
+Can also be ran as a standalone module.
+"""
 import argparse
 import os
 

@@ -1,9 +1,12 @@
+"""
+This program makes copies from one master yaml file and edits fields according to fire id.
+
+All fires are split by fire id for ease of running in parallel
+"""
 import yaml
 import os
 from pathlib import Path
 from constants import *
-
-# TODO: add one time geogrid run functionality
 
 class YamlRipper:
     def __init__(self, fireid: int):
