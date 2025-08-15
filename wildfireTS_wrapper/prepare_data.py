@@ -45,11 +45,12 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from constants import *
-from move_wrf import move_files
 from NmlRipper import NmlRipper
 from YamlRipper import YamlRipper
 from typing import List
 from fire_query.fire_query import plot_fire_locations
+from collections import deque
+from move_wrf import get_wrfout_files
 
 
 
@@ -79,6 +80,35 @@ def load_csv(state):
         return
     return pd.read_csv(CSV_DIR)
 
+# === Helper Functions ===
+def get_wrf_dir(fireid: str, fdate: str):
+    return SCRATCH_DIR / fireid / "wrf" / fdate
+
+def get_wps_dir(fireid: str, fdate: str):
+    return SCRATCH_DIR / fireid / "wps" / fdate
+
+# === Error Handling ===
+
+def open_log_file(logfile: Path):
+    with open(logfile, "r", encoding="utf-8", errors="ignore") as f:
+        last_lines = list(deque(f, maxlen=10))  # Only keep last 10 lines
+    return last_lines
+
+def display_error(e: str, logfile: Path, fireid=None, fdate=None):
+    time.sleep(1) # wait for log file
+    log_result = open_log_file(logfile)
+    if any("download_hrrr_from_aws_or_gc.py" in line for line in log_result):
+        print(f"[ERROR][{fireid}: {fdate}] HRRR data not found.")
+    elif any("run_wrf.py" in line for line in log_result) and len(get_wrfout_files(get_wrf_dir(fireid,fdate))) >= 30:
+        print(f"[{fireid}: {fdate}]WRF has finished, but did not exit gracefully.")
+    else:
+        print(f"[ERROR] {fireid} failed at date {fdate}: {str(e)}")
+        print(f"Consult {logfile} for more details.")
+        print("---------------- LOG FILE SNIPPET --------------------")
+        print(log_result)
+        print("------------------------------------------------------")
+
+
 # === WPS/WRF Running functions ===
 
 def run_command(cmd_args):
@@ -89,37 +119,21 @@ def run_command(cmd_args):
 
 def worker(command_list, geogrid_command, semaphore):
     with semaphore:
+        fireid = geogrid_command[4]
         try:
             subprocess.run(geogrid_command, check=True)
         except subprocess.CalledProcessError as e1:
-            logfile = HOME_DIR / 'logs' / geogrid_command[4] / f"{cmd[2].log}"
-            result = subprocess.run(
-                ["tail", "-n", "10", logfile],
-                capture_output=True,
-                text=True
-            )
-            print(f"[ERROR] Geogrid failed: {str(e1)}")
-            print(f"Consult {logfile} for more details.")
-            print("---------------- LOG FILE SNIPPET --------------------")
-            print(result.stdout)
-            print("------------------------------------------------------")
+            logfile = HOME_DIR / 'logs' / firei / f"{geogrid_command[2].log}"
+            display_error(e, logfile, fireid=fireid, fdate=geogrid_command[2])
             return
 
         for cmd in command_list:
+            fdate = cmd[2]
             try:
                 subprocess.run(cmd, check=True)
             except subprocess.CalledProcessError as e2:
-                logfile = HOME_DIR / 'logs' / cmd[4] / f"{cmd[2]}.log"
-                result = subprocess.run(
-                    ["tail", "-n", "10", logfile],
-                    capture_output=True,
-                    text=True
-                )
-                print(f"[ERROR] Command failed: {str(e2)}")
-                print(f"Consult {logfile} for more details.")
-                print("---------------- LOG FILE SNIPPET --------------------")
-                print(result.stdout)
-                print("------------------------------------------------------")
+                logfile = HOME_DIR / 'logs' / fireid / f"{fdate}.log"
+                display_error(e2, logfile, fireid=fireid, fdate=fdate)
 
 def run_fires_async(fire_command_dict, geogrid_command_dict, semaphore):
     threads = []
@@ -218,6 +232,8 @@ def main():
 
                 # Create a process map for ease of running by fire Id
                 for num_day, fdate in enumerate(fire_dates):
+                    if(num_day > args.num_days - 1):
+                        break
 
                     # change namelist
                     nr.edit(fdate)
@@ -233,8 +249,6 @@ def main():
                     process = ["bash",str(running_script),fdate,str(yaml_path), str(fireId)]
                     process_map[fireId].append(process)
 
-                    if(num_day > args.num_days):
-                        break
 
 
         run_fires_async(process_map, geogrid_map, semaphore)
@@ -245,15 +259,6 @@ def main():
         detach_monitor()
         move_wrf()
         print("Done!")
-
-def test():
-    start = pd.Timestamp("2018-07-01 00:00:00")
-    end = pd.Timestamp("2018-07-14 00:00:00")
-    lat= 40.147918
-    lon= -110.832934
-    fireid = 21890115
-    pkl = load_pickle()
-
 
 
 if __name__ == "__main__":
