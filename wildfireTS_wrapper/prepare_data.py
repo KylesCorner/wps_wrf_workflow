@@ -50,7 +50,7 @@ from YamlRipper import YamlRipper
 from typing import List
 from fire_query.fire_query import plot_fire_locations
 from collections import deque
-from move_wrf import get_wrfout_files
+from move_wrf import get_wrfout_files, move_all_wrfout
 
 
 
@@ -170,10 +170,6 @@ def attach_monitor():
 def detach_monitor():
     pass
 
-
-def move_wrf():
-    pass
-
 def parse():
     parser = argparse.ArgumentParser(
         description = "Run WPS/WRF for fires in a selected US state."
@@ -255,9 +251,8 @@ def main():
 
     finally:
 
-        # TODO: Move wrfout files
         detach_monitor()
-        move_wrf()
+        move_all_wrfout()
         print("Done!")
 
 
