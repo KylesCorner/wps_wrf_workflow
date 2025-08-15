@@ -9,6 +9,7 @@ docs/_build
 
 # template spam
 templates/[0-9]*
+templates/TX*
 
 # yaml spam
 config/[0-9]*.yaml
@@ -30,4 +31,5 @@ __pycache__/
 # misc files
 *.lock
 *.swp
+*.txt
 
