@@ -13,10 +13,10 @@
     parent_grid_ratio = 1
     i_parent_start = 1
     j_parent_start = 1
-    dx = 2000.0
-    dy = 2000.0
-    e_we = 170 ! 340 for 1km res
-    e_sn = 170 ! 340 for 1km res
+    dx = 1000.0
+    dy = 1000.0
+    e_we = 400 ! for 1km res
+    e_sn = 200 ! for 1km res
     geog_data_res = 'usgs_lakes+default'
     map_proj = 'lambert'
     ref_lat = 48.306248869896166
