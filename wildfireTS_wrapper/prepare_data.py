@@ -161,10 +161,9 @@ def run_fires_sync(fire_command_dict, geogrid_command_dict):
 
 def attach_monitor():
     print("[WARN] Process monitor not implemented!")
-    pass
 
 def detach_monitor():
-    pass
+    print("[WARN] Process monitor not implemented!")
 
 def parse():
     parser = argparse.ArgumentParser(
@@ -253,7 +252,7 @@ def main():
 
 
     detach_monitor()
-    #move_all_wrfout()
+    move_all_wrfout()
     print("Done!")
 
 
