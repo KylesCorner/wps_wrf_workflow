@@ -9,8 +9,8 @@ FIREID="$3"
 JOB_TITLE="$4"
 
 # set all the path variables
-WORK_DIR="/glade/u/home/krstulich/wps_wrf_workflow"
-ENV_PATH="/glade/work/krstulich/conda-envs/wps_wrf"
+WORK_DIR="/glade/u/home/$USER/wps_wrf_workflow"
+ENV_PATH="/glade/work/$USER/conda-envs/wps_wrf"
 PYTHON_SCRIPT="$WORK_DIR/setup_wps_wrf.py"
 SCRIPT_DIR="$WORK_DIR/scripts"
 LOG_DIR="${WORK_DIR}/logs/${FIREID}/"
