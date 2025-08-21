@@ -1,4 +1,4 @@
-# wps_wrf_workflow
+# Install and Configuration
 Python-based modular workflow for configuring and running WPS and WRF, and optionally also post-processing programs like UPP. Because of its modular nature, scripts to do additional steps can easily be added if desired.
 
 Before running this Python-based workflow, you need to do the following steps:
@@ -8,9 +8,19 @@ Before running this Python-based workflow, you need to do the following steps:
 ```
  conda env update -f environment.yml
 ```
+
+## Set Environment Variables
+Inside of the bash script `run.sh` There are two variables needing to be changed:
+
+| Variable Name | Purpose |
+| ------------- | --------- |
+| 'ENV_PATH' | Path to the confiured conda environment.|
+| 'WORK_DIR' | Path to the python project installation.|
+
+
 ----
 
-# WildfireTS WPS/WRF Processor
+# WildfireTS++ WPS/WRF Processor
 A command-line tool for fetching, filtering, and processing wildfire data with flexible options for dataset size, date range, threading, and state-based filtering.
 
 Features
@@ -28,6 +38,8 @@ Features
 | `--num-days, -n`      | int       | Number of past days to include in the dataset.                          | `--days 30`         |
 | `--threads, -t`   | int       | Number of worker threads for processing.                                | `--threads 8`       |
 | `--states, -s`    | str, list | Space-separated list of U.S. state names or abbreviations to filter by. | `--states CA WA OR` |
+| `--fireids, -f`    | str, list | Space-separated list of fire ids. | `--fireids MT1235 1234098` |
+| `--dry-run, -d`    | boolean | Preform a run that does not execute wps/wrf only sets up files. | `-dry-run` |
 
 ## Example
 ```
