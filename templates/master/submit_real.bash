@@ -15,5 +15,5 @@ mkdir -p $TMPDIR
 module list
 
 touch REAL_BEG
-mpiexec -n 128  ./real.exe
+mpiexec -n 128 ./real.exe
 touch REAL_END

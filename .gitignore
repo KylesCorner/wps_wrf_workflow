@@ -10,9 +10,16 @@ docs/_build
 # template spam
 templates/[0-9]*
 templates/TX*
+templates/CA*
+templates/MT*
+templates/WY*
 
 # yaml spam
 config/[0-9]*.yaml
+config/TX*.yaml
+config/CA*.yaml
+config/MT*.yaml
+config/WY*.yaml
 
 # no backups
 *.backup
@@ -22,6 +29,7 @@ logs/
 
 # no filtered csv
 wildfireTS_wrapper/*.csv
+wildfireTS_wrapper/fire_query/filtered_fires.csv
 
 # no pycache
 __pycache__/

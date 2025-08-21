@@ -6,6 +6,7 @@ set -euo pipefail
 START_DATE="$1"
 CONFIG_PATH="$2"
 FIREID="$3"
+JOB_TITLE="$4"
 
 # set all the path variables
 WORK_DIR="/glade/u/home/krstulich/wps_wrf_workflow"
@@ -24,7 +25,7 @@ mkdir -p ${LOG_DIR}
 LOGFILE="$LOG_DIR/${START_DATE}.log"
 
 # run the job
-echo "Running for fire $FIREID at $START_DATE"
+echo "Running $JOB_TITLE for fire $FIREID at $START_DATE"
 python3 setup_wps_wrf.py -b "$START_DATE" -c "$CONFIG_PATH" > "$LOGFILE" 2>&1
 
 trap 'echo "SIGTERM received!"; exit 1' TERM

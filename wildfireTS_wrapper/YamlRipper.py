@@ -19,6 +19,7 @@ class YamlRipper:
         self.wrf_config = {}
         self.geogrid_config = {}
 
+
     def __str__(self):
         output_str = "GEOGRID\n"
         for key, value in sorted(self.geogrid_config.items()):

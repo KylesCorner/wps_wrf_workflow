@@ -21,18 +21,6 @@
     Lon: float
         - Longitude for centroid.
 
-TODO: 
-    - keep track of dates/locations that have been processed in a csv. To try and stop duplicate entries.
-
-    - i want a running function for the subprocess.run I want to catch errors and check if wrf has completed correctly. WRF never exits gracefully
-
-    - Try and do some terrain smoothing
-
-STABILTY:
-    - reduce time step from 6 to 4
-    - reduce spacial resolution to 2 km
-
-    
 """
 import argparse
 import f90nml
@@ -50,7 +38,7 @@ from YamlRipper import YamlRipper
 from typing import List
 from fire_query.fire_query import plot_fire_locations
 from collections import deque
-from move_wrf import get_wrfout_files, move_all_wrfout
+from move_wrf import get_wrfout_files, move_all_wrfout, get_geogrid_files
 
 
 
@@ -73,19 +61,26 @@ def remove_old_files():
         nr.remove()
         yr.remove()
 
-def load_csv(state):
-    plot_fire_locations(state_filter=state, output_path=CSV_DIR)
+def load_csv(state,fireid):
+    plot_fire_locations(state_filter=state,fire_filter=fireid, output_path=CSV_DIR)
     if not os.path.exists(CSV_DIR):
         print("CSV file not found!")
-        return
+        exit(1)
     return pd.read_csv(CSV_DIR)
 
 # === Helper Functions ===
 def get_wrf_dir(fireid: str, fdate: str):
     return SCRATCH_DIR / fireid / "wrf" / fdate
 
-def get_wps_dir(fireid: str, fdate: str):
-    return SCRATCH_DIR / fireid / "wps" / fdate
+def get_geogrid_dir(fireid: str):
+    return SCRATCH_DIR / fireid / "wps" / "geogrid"
+
+def is_wrf_complete(fireid:str, fdate: str) -> bool:
+    return len(get_wrfout_files(get_wrf_dir(fireid,fdate))) >= 30
+
+def is_geogrid_complete(fireid:str) -> bool:
+    return len(get_geogrid_files(get_geogrid_dir(fireid))) >= 1
+
 
 # === Error Handling ===
 
@@ -99,13 +94,13 @@ def display_error(e: str, logfile: Path, fireid=None, fdate=None):
     log_result = open_log_file(logfile)
     if any("download_hrrr_from_aws_or_gc.py" in line for line in log_result):
         print(f"[ERROR][{fireid}: {fdate}] HRRR data not found.")
-    elif any("run_wrf.py" in line for line in log_result) and len(get_wrfout_files(get_wrf_dir(fireid,fdate))) >= 30:
+    elif any("run_wrf.py" in line for line in log_result) and is_wrf_complete(fireid,fdate):
         print(f"[{fireid}: {fdate}]WRF has finished, but did not exit gracefully.")
     else:
         print(f"[ERROR] {fireid} failed at date {fdate}: {str(e)}")
         print(f"Consult {logfile} for more details.")
         print("---------------- LOG FILE SNIPPET --------------------")
-        print(log_result)
+        print("\n".join(log_result))
         print("------------------------------------------------------")
 
 
@@ -117,14 +112,14 @@ def run_command(cmd_args):
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Command failed: {' '.join(cmd_args)}\n{e}")
 
-def worker(command_list, geogrid_command, semaphore):
+def worker(command_list, geogrid_command, semaphore, fireid):
     with semaphore:
-        fireid = geogrid_command[4]
         try:
-            subprocess.run(geogrid_command, check=True)
+            if geogrid_command:
+                subprocess.run(geogrid_command, check=True)
         except subprocess.CalledProcessError as e1:
-            logfile = HOME_DIR / 'logs' / firei / f"{geogrid_command[2].log}"
-            display_error(e, logfile, fireid=fireid, fdate=geogrid_command[2])
+            logfile = HOME_DIR / 'logs' / fireid / f"{geogrid_command[2]}.log"
+            display_error(e1, logfile, fireid=fireid, fdate=geogrid_command[2])
             return
 
         for cmd in command_list:
@@ -139,7 +134,7 @@ def run_fires_async(fire_command_dict, geogrid_command_dict, semaphore):
     threads = []
     for fireId, cmd in fire_command_dict.items():
         geogrid_command = geogrid_command_dict[fireId]
-        t = threading.Thread(target=worker, args=(cmd,geogrid_command, semaphore))
+        t = threading.Thread(target=worker, args=(cmd,geogrid_command, semaphore, str(fireId)))
         t.start()
         threads.append(t)
 
@@ -165,6 +160,7 @@ def run_fires_sync(fire_command_dict, geogrid_command_dict):
 # === Monitor Functions ===
 
 def attach_monitor():
+    print("[WARN] Process monitor not implemented!")
     pass
 
 def detach_monitor():
@@ -174,7 +170,8 @@ def parse():
     parser = argparse.ArgumentParser(
         description = "Run WPS/WRF for fires in a selected US state."
     )
-    parser.add_argument("--states","-s",nargs="+" ,help="Filer by US state name (e.g. Washington)", default=["WA"])
+    parser.add_argument("--states","-s",nargs="+" ,help="Filer by US state name (e.g. Washington)", default=None)
+    parser.add_argument("--fireids","-f",nargs="+" ,help="Filer by fireID", default=None)
     parser.add_argument("--max-fires", "-m", help="Max fires processed",type=int, default=MAX_FIRES)
     parser.add_argument("--num-days", "-n", help="Number of days to process per fire",type=int, default=MAX_DAYS)
     parser.add_argument("--threads", "-t", help="Number working threads",type=int, default=MAX_WORKERS)
@@ -192,76 +189,73 @@ def main():
     else:
         running_script = WRF_SCRIPT
 
-    state_csvs = [(state ,load_csv(state)) for state in args.states]
+    state_csv = load_csv(args.states, args.fireids)
 
     semaphore = threading.Semaphore(args.threads)
     process_map = {}
     geogrid_map = {}
 
-    try:
-        # run watchdog scripts
-        attach_monitor()
+    # run watchdog scripts
+    attach_monitor()
 
-        for state_name, state_csv in state_csvs:
-            # rip each fire in the pickle
-            for index, fire in state_csv.iterrows():
+    #for state_name, state_csv in state_csvs:
+        # rip each fire in the pickle
+    for index, fire in state_csv.iterrows():
+        state_name = fire[5]
 
-                # limit number of fires processed
-                if(index > args.max_fires - 1):
-                    break 
+        # limit number of fires processed
+        if(index > args.max_fires - 1):
+            break 
 
-                # setup run variables
-                nr = NmlRipper(fire)
-                fireId = nr.fireId
-                yr = YamlRipper(fireId)
-                fire_dates = nr.dateRange
-                process_map[fireId] = []
-                geogrid_map[fireId] = []
-                track_ripper(nr,yr)
+        # setup run variables
+        nr = NmlRipper(fire)
+        fireId = nr.fireId
+        yr = YamlRipper(fireId)
+        fire_dates = nr.dateRange
+        process_map[fireId] = []
+        geogrid_map[fireId] = []
+        track_ripper(nr,yr)
 
-                # setup and run the geogrid process once per fire id
-                yr.edit_geogrid()
-                yr.save_geogrid()
-                geogrid_path = yr.geogrid_output_path
-                geogrid_process = ["bash", str(running_script),fire_dates[0], str(geogrid_path), str(fireId)]
-                geogrid_map[fireId] = geogrid_process
+        # setup and run the geogrid process once per fire id
+        yr.edit_geogrid()
+        yr.save_geogrid()
+        geogrid_path = yr.geogrid_output_path
+        if not is_geogrid_complete(str(fireId)):
+            geogrid_process = ["bash", str(running_script),fire_dates[0], str(geogrid_path), str(fireId), "Geogrid"]
+            geogrid_map[fireId] = geogrid_process
+        else:
+            print(f"Geogrid already generated for {str(fireId)}, skipping.")
 
-                # Create a process map for ease of running by fire Id
-                for num_day, fdate in enumerate(fire_dates):
-                    if(num_day > args.num_days - 1):
-                        break
+        # Create a process map for ease of running by fire Id
+        for num_day, fdate in enumerate(fire_dates):
+            if(num_day > args.num_days - 1):
+                break
 
-                    # change namelist
-                    nr.edit(fdate)
-                    nr.save()
-                    template_dir = nr.output_dir
+            # change namelist
+            nr.edit(fdate)
+            nr.save()
+            template_dir = nr.output_dir
 
-                    # generate yaml
-                    yr.edit()
-                    yr.save()
-                    yaml_path = yr.wrf_output_path
+            # generate yaml
+            yr.edit()
+            yr.save()
+            yaml_path = yr.wrf_output_path
 
-                    print(f"Pre-processing {state_name} fire: {fireId} at {fdate}")
-                    process = ["bash",str(running_script),fdate,str(yaml_path), str(fireId)]
-                    process_map[fireId].append(process)
+            if not is_wrf_complete(str(fireId), fdate):
+                print(f"Pre-processing {state_name} fire: {fireId} at {fdate}")
+                process = ["bash",str(running_script),fdate,str(yaml_path), str(fireId), "WPS/WRF"]
+                process_map[fireId].append(process)
+            else:
+                print(f"{state_name} fire: {fireId} at {fdate} already completed, skipping.")
 
 
+    run_fires_async(process_map, geogrid_map, semaphore)
 
-        run_fires_async(process_map, geogrid_map, semaphore)
 
-    finally:
-
-        detach_monitor()
-        move_all_wrfout()
-        print("Done!")
+    detach_monitor()
+    #move_all_wrfout()
+    print("Done!")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n[ABORTED] Keyboard interrupt received. Terminating...")
-        #remove_old_files()
-        detach_monitor()
-        #subprocess.run(['bash', str(STOP_SCRIPT)], check=True)
-
+    main()

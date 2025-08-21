@@ -7,6 +7,7 @@ this file will move wrfout files and organize them by fireid
 from constants import *
 import os
 import shutil
+from pathlib import Path
 
 # === Private Functions ===
 
@@ -46,18 +47,17 @@ def __extract_wrfout_metadata(wrfout_files):
         Each tuple is (file_path, fire_id, date_str)
         - fire_id : the name of the fire ID directory
         - date_str : the name of the date folder (YYYYMMDD_HH)
+        - filename: full name of the wrfout file
     """
     results = []
     for file_path in wrfout_files:
         parts = file_path.split(os.sep)
         try:
-            # parts[-2] = date folder
-            # parts[-3] = "wrf"
-            # parts[-4] = fire ID
             filename = parts[-1]
             date_str = parts[-2]
             fire_id = parts[-4]
-            results.append((file_path, fire_id, date_str, filename))
+            if str(fire_id) != "wrfout":
+                results.append((file_path, fire_id, date_str, filename))
         except IndexError:
             # Skip files that don't match expected structure
             continue
@@ -65,8 +65,9 @@ def __extract_wrfout_metadata(wrfout_files):
 
 def __move_wrf_files(metadata):
 
+
     for file_path, fireid, fdate, file_name in metadata:
-        out_dir = SCRATCH_DIR / "wrfout" / fireid / fdate
+        out_dir = Path(f"/glade/derecho/scratch/krstulich/wrfout/{fireid}/{fdate}")
         out_dir.mkdir(parents=True, exist_ok=True)
         out_file = out_dir / file_name
         shutil.copy(file_path,out_file)
@@ -89,14 +90,27 @@ def get_wrfout_files(folder_path):
         List of full file paths matching 'wrfout*'
     """
     wrfout_files = []
-    for filename in os.listdir(folder_path):
-        if filename.startswith("wrfout") and os.path.isfile(os.path.join(folder_path, filename)):
-            wrfout_files.append(os.path.join(folder_path, filename))
+    if os.path.exists(folder_path):
+        for filename in os.listdir(folder_path):
+            if filename.startswith("wrfout") and os.path.isfile(os.path.join(folder_path, filename)):
+                wrfout_files.append(os.path.join(folder_path, filename))
     return wrfout_files
+
+def get_geogrid_files(folder_path):
+    geogrid_files = []
+    if os.path.exists(folder_path):
+        for filename in os.listdir(folder_path):
+            if filename.startswith("geo_em") and os.path.isfile(os.path.join(folder_path, filename)):
+                geogrid_files.append(os.path.join(folder_path, filename))
+    return geogrid_files
 
 def move_all_wrfout():
     wrf_files = __get_all_wrfout_files()
     metadata = __extract_wrfout_metadata(wrf_files)
     __move_wrf_files(metadata)
+
+if __name__ == "__main__":
+    move_all_wrfout()
+
 
 

@@ -77,15 +77,21 @@ US_STATES = {
     "WY": "Wyoming"
 }
 
+def plot_fire_locations(state_filter=None, output_path=None, show_plot=False, fire_filter=None):
 
-def plot_fire_locations(state_filter=None, output_path=None, show_plot=False):
-    # convert state abbreviation to full name
-    if state_filter in US_STATES.keys():
-        state_filter = US_STATES[state_filter]
 
-    elif state_filter not in US_STATES.values():
-        raise ValueError(f"{state_filter} is not a valid US state.")
+    if state_filter:
+        for index, state in enumerate(state_filter):
 
+            # convert state abbreviation to full name
+            if state in US_STATES.keys():
+                state_filter[index] = US_STATES[state]
+
+            elif state not in US_STATES.values():
+                raise ValueError(f"{state} is not a valid US state.")
+
+    else:
+        state_filter = list(US_STATES.values())
 
     # Load fire points
     csv_path = ALL_FIRES_CSV
@@ -107,19 +113,54 @@ def plot_fire_locations(state_filter=None, output_path=None, show_plot=False):
     states_gdf = states_gdf[states_gdf["admin"] == "United States of America"]
 
     if state_filter:
-        state_geom = states_gdf[states_gdf["name"].str.lower() == state_filter.lower()]
+        if isinstance(state_filter, str):
+            state_filter = [state_filter]
+
+        # Lowercase both the dataframe column and the filters
+        state_filter = [s.lower() for s in state_filter]
+        state_geom = states_gdf[states_gdf["name"].str.lower().isin([s.lower() for s in state_filter])]
+
         if state_geom.empty:
-            raise ValueError(f"State '{state_filter}' not found.")
+            raise ValueError(f"State '{state_filters}' not found.")
+
+        # Combine all geometries into one (union of states)
+        combined_geom = state_geom.union_all()
+
+
         # Filter points inside state polygon
-        gdf = gdf[gdf.geometry.within(state_geom.iloc[0].geometry)]
+        gdf = gdf[gdf.geometry.within(combined_geom)]
         if gdf.empty:
             print(f"No fires found in state: {state_filter}")
             return
 
-        # Save filtered CSV
-        if not output_path:
-            output_path = f"filtered_fires.csv"
-        gdf.drop(columns="geometry").to_csv(output_path, index=False)
+        # Create a column for the state each fire belongs to
+        def fire_state(fire_point):
+            for _, row in state_geom.iterrows():
+                if fire_point.within(row.geometry):
+                    return row["name"]  # original state name
+            return None
+
+        gdf["state_name"] = gdf.geometry.apply(fire_state)
+
+    # Handle fire ID filtering
+    if fire_filter:
+        if isinstance(fire_filter, str):
+            fire_filter = [fire_filter]
+
+        fire_filter = [f.upper() for f in fire_filter]
+        gdf = gdf[gdf["fire_id"].str.upper().isin([fid for fid in fire_filter])]
+        if gdf.empty:
+            print(f"No fires found with fire IDs: {', '.join(fire_filter)}")
+            return
+
+        if gdf.empty:
+            print(f"No fires found with fire IDs: {', '.join(fire_filter)}")
+            return
+
+    # Save filtered CSV
+    if not output_path:
+        output_path = f"filtered_fires.csv"
+    gdf.drop(columns="geometry").to_csv(output_path, index=False)
 
     # Plot
     if show_plot:
@@ -161,9 +202,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Plot fire locations and export filtered CSV."
     )
-    parser.add_argument("--state", help="Filter by U.S. state name (e.g. Washington)")
+    parser.add_argument("--states","-s",nargs="+" ,help="Filer by US state name (e.g. Washington)", default=None)
+    parser.add_argument("--fire-ids","-f",nargs="+" ,help="Filer by Fire ID", default=None)
     parser.add_argument("--show-plot", help="Display the map of fire locations")
     args = parser.parse_args()
 
-    plot_fire_locations(args.state)
+    fires = plot_fire_locations(state_filter=args.states, fire_filter=args.fire_ids)
 
