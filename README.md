@@ -9,15 +9,6 @@ Before running this Python-based workflow, you need to do the following steps:
  conda env update -f environment.yml
 ```
 
-## Set Environment Variables
-Inside of the bash script `run.sh` There are two variables needing to be changed:
-
-| Variable Name | Purpose |
-| ------------- | --------- |
-| 'ENV_PATH' | Path to the confiured conda environment.|
-| 'WORK_DIR' | Path to the python project installation.|
-
-
 ----
 
 # WildfireTS++ WPS/WRF Processor
